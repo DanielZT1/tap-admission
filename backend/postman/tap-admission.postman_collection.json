@@ -1,0 +1,79 @@
+{
+  "info": {
+    "name": "TAP Admission API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": "{{base_url}}/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"admin@tap.local\",\"password\":\"Password123!\"}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "Productos",
+      "item": [
+        {
+          "name": "Listar",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/products"
+          }
+        },
+        {
+          "name": "Crear",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Chaleco reflejante\",\"brand\":\"TAP Safety\",\"price\":320}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuarios",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{base_url}}/users"
+      }
+    },
+    {
+      "name": "Perfiles",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{base_url}}/profiles"
+      }
+    }
+  ]
+}

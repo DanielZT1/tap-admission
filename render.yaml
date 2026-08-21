@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: tap-admission-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - key: APP_NAME
+        value: TAP Admission
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_TIMEZONE
+        value: America/Mexico_City
+      - key: APP_KEY
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: DB_CONNECTION
+        value: mongodb
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_DATABASE
+        value: tap_admission
+      - key: SESSION_DRIVER
+        value: file
+      - key: CACHE_STORE
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: MAIL_MAILER
+        value: log

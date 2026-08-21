@@ -1,0 +1,130 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Backend Laravel
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v3
+        with:
+          php-version: "8.4"
+          extensions: mongodb, gd, intl, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Lint PHP
+        run: find app routes database config bootstrap -name "*.php" -print0 | xargs -0 -n1 php -l
+
+      - name: Run tests
+        env:
+          DB_CONNECTION: mongodb
+          MONGODB_URI: mongodb://127.0.0.1:27017
+          DB_DATABASE: tap_admission_ci
+        run: php artisan test
+
+  frontend:
+    name: Frontend Angular
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: ./node_modules/.bin/tsc -p tsconfig.app.json --noEmit
+
+      - name: Build
+        run: pnpm build
+
+  deploy:
+    name: Deploy
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Trigger Render backend deploy
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+          else
+            echo "RENDER_DEPLOY_HOOK_URL is not configured; skipping backend deploy."
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Build and deploy Netlify frontend
+        working-directory: frontend
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "Netlify secrets are not configured; skipping frontend deploy."
+            exit 0
+          fi
+          pnpm install --frozen-lockfile
+          pnpm build
+          npx netlify-cli deploy --prod --dir=dist/tap-admission-frontend/browser
