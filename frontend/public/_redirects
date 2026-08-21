@@ -1,2 +1,2 @@
-/api/* https://REPLACE_WITH_YOUR_RENDER_BACKEND.onrender.com/api/:splat 200
+/api/* https://tap-admission-api.onrender.com/api/:splat 200
 /* /index.html 200
