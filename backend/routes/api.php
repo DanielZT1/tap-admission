@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\UserController;
@@ -16,6 +17,9 @@ Route::post('/recover-password', [AuthController::class, 'recoverPassword']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::get('/audit-logs', [AuditLogController::class, 'index'])
+        ->middleware('section:audit_logs');
 
     Route::prefix('products')->middleware('section:products')->group(function () {
         Route::get('/export/excel', [ProductController::class, 'excel']);

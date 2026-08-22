@@ -1,0 +1,977 @@
+openapi: 3.0.3
+info:
+  title: TAP Admission API
+  version: 1.0.0
+  description: |
+    API REST para el examen de admision TAP. Incluye autenticacion, recuperacion
+    de credenciales, administracion de productos, usuarios, perfiles, exportes
+    PDF/Excel y control de acceso por secciones asignadas al perfil.
+servers:
+  - url: http://tap-admission-api.test/api
+    description: Local con Laragon
+  - url: https://tap-admission-api.onrender.com/api
+    description: Produccion en Render
+tags:
+  - name: Health
+    description: Diagnostico del servicio
+  - name: Auth
+    description: Autenticacion y recuperacion de credenciales
+  - name: Audit Logs
+    description: Bitacora de cambios con informacion anterior y actual
+  - name: Products
+    description: Catalogo de productos
+  - name: Users
+    description: Administracion de usuarios
+  - name: Profiles
+    description: Perfiles y permisos por seccion
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Verificar estado de la API
+      operationId: health
+      responses:
+        "200":
+          description: Servicio disponible
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                app: TAP Admission
+  /login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesion
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              email: admin@tap.local
+              password: Password123!
+      responses:
+        "200":
+          description: Token de acceso generado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /recover-password:
+    post:
+      tags: [Auth]
+      summary: Recuperar credenciales
+      description: Valida que el usuario exista y envia una contrasena temporal al correo registrado.
+      operationId: recoverPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoverPasswordRequest"
+            example:
+              email: admin@tap.local
+      responses:
+        "200":
+          description: Correo de recuperacion enviado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Se enviaron credenciales temporales al correo registrado.
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Cerrar sesion
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sesion cerrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Sesion cerrada.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /audit-logs:
+    get:
+      tags: [Audit Logs]
+      summary: Listar bitacora de cambios
+      description: Devuelve los ultimos 100 movimientos registrados para comparar informacion anterior contra informacion actual.
+      operationId: listAuditLogs
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de registros de bitacora
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /products:
+    get:
+      tags: [Products]
+      summary: Listar productos
+      operationId: listProducts
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de productos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Products]
+      summary: Crear producto
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductRequest"
+            example:
+              name: Botas de seguridad
+              brand: TAP Safety
+              price: 320
+      responses:
+        "201":
+          description: Producto creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /products/{product}:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    get:
+      tags: [Products]
+      summary: Ver detalle de producto
+      operationId: showProduct
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Producto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Products]
+      summary: Actualizar producto
+      operationId: updateProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductRequest"
+      responses:
+        "200":
+          description: Producto actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [Products]
+      summary: Eliminar producto
+      operationId: deleteProduct
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Producto eliminado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Producto eliminado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /products/export/pdf:
+    get:
+      tags: [Products]
+      summary: Exportar productos en PDF
+      operationId: exportProductsPdf
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PdfFile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /products/export/excel:
+    get:
+      tags: [Products]
+      summary: Exportar productos en Excel
+      operationId: exportProductsExcel
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ExcelFile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /users:
+    get:
+      tags: [Users]
+      summary: Listar usuarios
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserListItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Users]
+      summary: Crear usuario
+      description: Envia multipart/form-data porque la foto de perfil es obligatoria al crear.
+      operationId: createUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UserCreateRequest"
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /users/{user}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      tags: [Users]
+      summary: Ver detalle de usuario
+      operationId: showUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Usuario encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Users]
+      summary: Actualizar usuario
+      description: Alternativa REST para actualizar usuario. Si el cliente no soporta multipart con PUT, use POST con query `_method=PUT`.
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UserUpdateRequest"
+      responses:
+        "200":
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    post:
+      tags: [Users]
+      summary: Actualizar usuario via multipart override
+      description: El frontend Angular usa `POST /api/users/{id}?_method=PUT` para enviar FormData con foto.
+      operationId: updateUserMultipartOverride
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: _method
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [PUT]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UserUpdateRequest"
+      responses:
+        "200":
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [Users]
+      summary: Eliminar usuario
+      operationId: deleteUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Usuario eliminado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Usuario eliminado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /users/export/pdf:
+    get:
+      tags: [Users]
+      summary: Exportar usuarios en PDF
+      operationId: exportUsersPdf
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PdfFile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /users/export/excel:
+    get:
+      tags: [Users]
+      summary: Exportar usuarios en Excel
+      operationId: exportUsersExcel
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ExcelFile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /profiles:
+    get:
+      tags: [Profiles]
+      summary: Listar perfiles
+      operationId: listProfiles
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de perfiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Profiles]
+      summary: Crear perfil
+      operationId: createProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileRequest"
+            example:
+              name: Catalogos
+              section_keys: [products]
+      responses:
+        "201":
+          description: Perfil creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /profiles/{profile}:
+    parameters:
+      - $ref: "#/components/parameters/ProfileId"
+    get:
+      tags: [Profiles]
+      summary: Ver detalle de perfil
+      operationId: showProfile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Perfil encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Profiles]
+      summary: Actualizar perfil
+      operationId: updateProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileRequest"
+      responses:
+        "200":
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [Profiles]
+      summary: Eliminar perfil
+      operationId: deleteProfile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Perfil eliminado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: Perfil eliminado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /profiles/export/pdf:
+    get:
+      tags: [Profiles]
+      summary: Exportar perfiles en PDF
+      operationId: exportProfilesPdf
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PdfFile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /profiles/export/excel:
+    get:
+      tags: [Profiles]
+      summary: Exportar perfiles en Excel
+      operationId: exportProfilesExcel
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ExcelFile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum token
+  parameters:
+    ProductId:
+      name: product
+      in: path
+      required: true
+      description: ID MongoDB del producto.
+      schema:
+        type: string
+      example: 66c75c6bc083e218d10c0a11
+    UserId:
+      name: user
+      in: path
+      required: true
+      description: ID MongoDB del usuario.
+      schema:
+        type: string
+      example: 66c75c6bc083e218d10c0a12
+    ProfileId:
+      name: profile
+      in: path
+      required: true
+      description: ID MongoDB del perfil.
+      schema:
+        type: string
+      example: 66c75c6bc083e218d10c0a13
+  responses:
+    Unauthorized:
+      description: Token ausente o invalido.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: Unauthenticated.
+    Forbidden:
+      description: El usuario autenticado no tiene acceso a la seccion.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: No tienes acceso a esta seccion.
+    NotFound:
+      description: Recurso no encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            message: No query results for model.
+    ValidationError:
+      description: Error de validacion.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+          example:
+            message: The given data was invalid.
+            errors:
+              email:
+                - Las credenciales no son validas.
+    PdfFile:
+      description: Archivo PDF descargable.
+      content:
+        application/pdf:
+          schema:
+            type: string
+            format: binary
+    ExcelFile:
+      description: Archivo XLSX descargable.
+      content:
+        application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+          schema:
+            type: string
+            format: binary
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, app]
+      properties:
+        status:
+          type: string
+          example: ok
+        app:
+          type: string
+          example: TAP Admission
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    ValidationError:
+      type: object
+      required: [message, errors]
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 160
+        password:
+          type: string
+          format: password
+    RecoverPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    LoginResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: Token Bearer de Laravel Sanctum.
+        user:
+          $ref: "#/components/schemas/AuthUser"
+    AuthUser:
+      type: object
+      required: [id, user_code, name, email, sections]
+      properties:
+        id:
+          type: string
+        user_code:
+          type: string
+          example: USR-ADMIN
+        name:
+          type: string
+          example: Administrador TAP
+        email:
+          type: string
+          format: email
+          example: admin@tap.local
+        sections:
+          type: array
+          items:
+            type: string
+            enum: [products, users, profiles, audit_logs]
+    ProductRequest:
+      type: object
+      required: [name, brand, price]
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        brand:
+          type: string
+          maxLength: 120
+        price:
+          type: integer
+          minimum: 0
+          maximum: 999
+    Product:
+      allOf:
+        - $ref: "#/components/schemas/ProductRequest"
+        - type: object
+          required: [id, product_code, created_at]
+          properties:
+            id:
+              type: string
+            product_code:
+              type: string
+              example: PRD-260821-ABC123
+            created_at:
+              type: string
+              example: 21/08/2026 15:30
+    UserListItem:
+      type: object
+      required: [id, user_code, email, name, created_at]
+      properties:
+        id:
+          type: string
+        user_code:
+          type: string
+          example: USR-ADMIN
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        created_at:
+          type: string
+          example: 21/08/2026 15:30
+    UserDetail:
+      allOf:
+        - $ref: "#/components/schemas/UserListItem"
+        - type: object
+          properties:
+            phone:
+              type: string
+              nullable: true
+              pattern: "^\\+[1-9]\\d{7,14}$"
+              example: +523141234567
+            profile_photo_path:
+              type: string
+              nullable: true
+              example: profiles/admin.png
+            profiles:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProfileReference"
+    UserCreateRequest:
+      type: object
+      required: [name, email, profile_photo, profile_ids]
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        email:
+          type: string
+          format: email
+          maxLength: 160
+          description: Debe ser unico.
+        phone:
+          type: string
+          nullable: true
+          pattern: "^\\+[1-9]\\d{7,14}$"
+          example: +523141234567
+        password:
+          type: string
+          nullable: true
+          minLength: 8
+          maxLength: 64
+          description: Opcional. Si no se envia, se genera una contrasena temporal.
+        profile_photo:
+          type: string
+          format: binary
+          description: Imagen JPG, JPEG, PNG o WEBP. Maximo 2 MB.
+        profile_ids[]:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          description: IDs MongoDB de perfiles asignados.
+    UserUpdateRequest:
+      type: object
+      required: [name, email, profile_ids]
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        email:
+          type: string
+          format: email
+          maxLength: 160
+          description: Debe ser unico.
+        phone:
+          type: string
+          nullable: true
+          pattern: "^\\+[1-9]\\d{7,14}$"
+          example: +523141234567
+        password:
+          type: string
+          nullable: true
+          minLength: 8
+          maxLength: 64
+        profile_photo:
+          type: string
+          format: binary
+          description: Opcional en actualizacion. Imagen JPG, JPEG, PNG o WEBP. Maximo 2 MB.
+        profile_ids[]:
+          type: array
+          minItems: 1
+          items:
+            type: string
+    ProfileRequest:
+      type: object
+      required: [name, section_keys]
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        section_keys:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [products, users, profiles, audit_logs]
+    Profile:
+      type: object
+      required: [id, profile_code, name, created_at]
+      properties:
+        id:
+          type: string
+        profile_code:
+          type: string
+          example: PRF-260821-ABC123
+        name:
+          type: string
+        created_at:
+          type: string
+          example: 21/08/2026 15:30
+    ProfileDetail:
+      allOf:
+        - $ref: "#/components/schemas/Profile"
+        - type: object
+          required: [section_keys]
+          properties:
+            section_keys:
+              type: array
+              items:
+                type: string
+                enum: [products, users, profiles, audit_logs]
+    AuditLog:
+      type: object
+      required: [id, entity, entity_id, action, previous, current, created_at]
+      properties:
+        id:
+          type: string
+        entity:
+          type: string
+          enum: [product, user, profile]
+          example: product
+        entity_id:
+          type: string
+          example: 66c75c6bc083e218d10c0a11
+        action:
+          type: string
+          enum: [created, updated, deleted]
+          example: updated
+        previous:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Valores antes de la operacion. Los campos sensibles se muestran como protegidos.
+        current:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Valores despues de la operacion. Los campos sensibles se muestran como protegidos.
+        actor_user_code:
+          type: string
+          nullable: true
+          example: USR-ADMIN
+        created_at:
+          type: string
+          example: 22/08/2026 10:15
+    ProfileReference:
+      type: object
+      required: [id, profile_code, name]
+      properties:
+        id:
+          type: string
+        profile_code:
+          type: string
+          example: PRF-ADMIN
+        name:
+          type: string
+          example: Administrador

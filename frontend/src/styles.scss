@@ -3,6 +3,10 @@
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #f6f7f9;
   color: #1f2937;
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-slow: 320ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -13,6 +17,37 @@ body {
   margin: 0;
   min-width: 320px;
   overflow-x: hidden;
+}
+
+@keyframes surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 button, input, select {
@@ -45,6 +80,7 @@ button {
   background: #fff;
   width: 100%;
   min-width: 0;
+  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, background var(--motion-fast) ease;
 }
 
 .field input:focus,
@@ -63,6 +99,7 @@ button {
   justify-content: center;
   min-height: 38px;
   padding: 8px 12px;
+  transition: background var(--motion-fast) ease, box-shadow var(--motion-fast) ease, color var(--motion-fast) ease, transform var(--motion-fast) ease;
   white-space: nowrap;
 }
 
@@ -71,9 +108,18 @@ button {
   color: #fff;
 }
 
+.btn.primary:hover {
+  background: #1e40af;
+  box-shadow: 0 10px 20px rgba(29, 78, 216, 0.18);
+}
+
 .btn.secondary {
   background: #e5e7eb;
   color: #111827;
+}
+
+.btn.secondary:hover {
+  background: #d1d5db;
 }
 
 .btn.danger {
@@ -81,9 +127,26 @@ button {
   color: #fff;
 }
 
+.btn.danger:hover {
+  background: #991b1b;
+  box-shadow: 0 10px 20px rgba(185, 28, 28, 0.16);
+}
+
 .btn.ghost {
   background: transparent;
   color: #1d4ed8;
+}
+
+.btn.ghost:hover {
+  background: #eff6ff;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
 }
 
 .table-wrap {
@@ -104,6 +167,14 @@ th, td {
   vertical-align: middle;
 }
 
+tbody tr {
+  transition: background var(--motion-fast) ease;
+}
+
+tbody tr:hover {
+  background: #f8fafc;
+}
+
 th {
   color: #475569;
   font-size: 12px;
@@ -117,10 +188,17 @@ th {
 }
 
 .panel {
+  animation: surface-in var(--motion-slow) var(--ease-out) both;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 18px;
+  transition: border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
+}
+
+.panel:hover {
+  border-color: #dbe2ea;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
 }
 
 .grid-form {
@@ -137,6 +215,7 @@ th {
 }
 
 .alert-card {
+  animation: surface-in var(--motion-base) var(--ease-out) both;
   background: #fff7ed;
   border: 1px solid #fed7aa;
   border-left: 4px solid #ea580c;
@@ -165,6 +244,7 @@ th {
   grid-template-columns: auto 1fr;
   min-height: 40px;
   overflow: hidden;
+  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
 }
 
 .input-prefix span {
@@ -191,6 +271,7 @@ th {
 
 .modal-backdrop {
   align-items: center;
+  animation: backdrop-in var(--motion-base) ease both;
   background: rgba(15, 23, 42, 0.44);
   display: flex;
   inset: 0;
@@ -201,6 +282,7 @@ th {
 }
 
 .confirm-card {
+  animation: modal-in var(--motion-base) var(--ease-out) both;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -235,7 +317,7 @@ th {
   min-height: 76px;
   padding: 12px;
   text-align: center;
-  transition: border-color 140ms ease, background 140ms ease;
+  transition: border-color var(--motion-fast) ease, background var(--motion-fast) ease, box-shadow var(--motion-fast) ease, transform var(--motion-fast) ease;
 }
 
 .dropzone strong {
@@ -250,6 +332,8 @@ th {
 .dropzone.active {
   background: #eff6ff;
   border-color: #2563eb;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.12);
+  transform: translateY(-1px);
 }
 
 .visually-hidden-input {
@@ -277,5 +361,16 @@ th {
 
   table {
     min-width: 680px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
   }
 }

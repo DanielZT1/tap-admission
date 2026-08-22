@@ -102,6 +102,39 @@ import { saveBlob } from '../../shared/download';
         </article>
       </div>
     }
+
+    @if (productToView) {
+      <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="product-detail-title">
+        <article class="detail-card">
+          <header>
+            <div>
+              <span>Detalle del producto</span>
+              <h2 id="product-detail-title">{{ productToView.name }}</h2>
+            </div>
+            <button class="btn secondary" type="button" (click)="productToView = undefined">Cerrar</button>
+          </header>
+
+          <dl>
+            <div>
+              <dt>Codigo</dt>
+              <dd>{{ productToView.product_code }}</dd>
+            </div>
+            <div>
+              <dt>Marca</dt>
+              <dd>{{ productToView.brand }}</dd>
+            </div>
+            <div>
+              <dt>Precio</dt>
+              <dd>&#36;{{ productToView.price }}</dd>
+            </div>
+            <div>
+              <dt>Fecha de creacion</dt>
+              <dd>{{ productToView.created_at }}</dd>
+            </div>
+          </dl>
+        </article>
+      </div>
+    }
   `,
   styles: [`
     .submit {
@@ -109,6 +142,75 @@ import { saveBlob } from '../../shared/download';
     }
     .list {
       margin-top: 16px;
+    }
+    .detail-card {
+      animation: modal-in var(--motion-base) var(--ease-out) both;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
+      padding: 20px;
+      width: min(100%, 520px);
+    }
+    .detail-card header {
+      align-items: flex-start;
+      display: flex;
+      gap: 14px;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .detail-card span {
+      color: #64748b;
+      display: block;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .detail-card h2 {
+      color: #0f172a;
+      font-size: 20px;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+    .detail-card dl {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin: 0;
+    }
+    .detail-card dl div {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      transition: border-color var(--motion-fast) ease, transform var(--motion-fast) ease;
+    }
+    .detail-card dl div:hover {
+      border-color: #cbd5e1;
+      transform: translateY(-1px);
+    }
+    .detail-card dt {
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .detail-card dd {
+      color: #0f172a;
+      font-weight: 750;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 560px) {
+      .detail-card header {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .detail-card dl {
+        grid-template-columns: 1fr;
+      }
     }
   `],
 })
@@ -119,6 +221,7 @@ export class ProductsComponent implements OnInit {
   formErrors: string[] = [];
   priceInput = '';
   productToDelete?: Product;
+  productToView?: Product;
 
   constructor(
     private readonly api: ApiService,
@@ -164,7 +267,7 @@ export class ProductsComponent implements OnInit {
   }
 
   view(product: Product): void {
-    alert(`${product.product_code}\n${product.name}\nMarca: ${product.brand}`);
+    this.productToView = product;
   }
 
   remove(product: Product): void {
@@ -187,6 +290,7 @@ export class ProductsComponent implements OnInit {
     this.form = { name: '', brand: '', price: 0 };
     this.priceInput = '';
     this.formErrors = [];
+    this.productToView = undefined;
   }
 
   download(type: 'pdf' | 'excel'): void {

@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { AppUser, LoginResponse, Product, Profile } from './api.models';
+import { AppUser, AuditLog, LoginResponse, Product, Profile } from './api.models';
 
 const apiUrl = '/api';
 
@@ -18,6 +18,10 @@ export class ApiService {
 
   logout() {
     return this.http.post<{ message: string }>(`${apiUrl}/logout`, {});
+  }
+
+  auditLogs() {
+    return this.http.get<AuditLog[]>(`${apiUrl}/audit-logs`);
   }
 
   products() {

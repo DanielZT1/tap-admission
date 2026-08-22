@@ -48,10 +48,11 @@ jobs:
 
       - name: Run tests
         env:
+          LOG_CHANNEL: null
           DB_CONNECTION: mongodb
           MONGODB_URI: mongodb://127.0.0.1:27017
           DB_DATABASE: tap_admission_ci
-        run: php artisan test
+        run: php vendor/bin/phpunit
 
   frontend:
     name: Frontend Angular

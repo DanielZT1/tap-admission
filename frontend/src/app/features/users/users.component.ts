@@ -112,6 +112,65 @@ import { saveBlob } from '../../shared/download';
         </table>
       </div>
     </section>
+
+    @if (selectedUser) {
+      <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="user-detail-title">
+        <article class="detail-card">
+          <header>
+            <div>
+              <span>Detalle de usuario</span>
+              <h2 id="user-detail-title">{{ selectedUser.name }}</h2>
+            </div>
+            <button class="btn secondary" type="button" (click)="selectedUser = undefined">Cerrar</button>
+          </header>
+
+          <dl>
+            <div>
+              <dt>Codigo</dt>
+              <dd>{{ selectedUser.user_code }}</dd>
+            </div>
+            <div>
+              <dt>Usuario</dt>
+              <dd>{{ selectedUser.email }}</dd>
+            </div>
+            <div>
+              <dt>Telefono</dt>
+              <dd>{{ selectedUser.phone || 'Sin telefono' }}</dd>
+            </div>
+            <div>
+              <dt>Foto de perfil</dt>
+              <dd>{{ selectedUser.profile_photo_path || 'Sin foto registrada' }}</dd>
+            </div>
+          </dl>
+
+          <section class="profile-section">
+            <h3>Perfiles relacionados</h3>
+            @if (selectedUser.profiles?.length) {
+              <div class="chip-list">
+                @for (profile of selectedUser.profiles ?? []; track profile.id) {
+                  <span>{{ profile.name }}</span>
+                }
+              </div>
+            } @else {
+              <p>Sin perfiles relacionados.</p>
+            }
+          </section>
+        </article>
+      </div>
+    }
+
+    @if (userToDelete) {
+      <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="delete-user-title">
+        <article class="confirm-card">
+          <h2 id="delete-user-title">Se quiere eliminar un usuario</h2>
+          <p>Esta accion eliminara <strong>{{ userToDelete.name }}</strong> y sus tokens de acceso.</p>
+          <div class="actions">
+            <button class="btn secondary" type="button" (click)="userToDelete = undefined">Cancelar</button>
+            <button class="btn danger" type="button" (click)="confirmDelete()">Eliminar</button>
+          </div>
+        </article>
+      </div>
+    }
   `,
   styles: [`
     .submit {
@@ -119,6 +178,103 @@ import { saveBlob } from '../../shared/download';
     }
     .list {
       margin-top: 16px;
+    }
+    .detail-card {
+      animation: modal-in var(--motion-base) var(--ease-out) both;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
+      max-height: min(86vh, 760px);
+      overflow: auto;
+      padding: 20px;
+      width: min(100%, 620px);
+    }
+    .detail-card header {
+      align-items: flex-start;
+      display: flex;
+      gap: 14px;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .detail-card header span {
+      color: #64748b;
+      display: block;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .detail-card h2 {
+      color: #0f172a;
+      font-size: 20px;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+    .detail-card dl {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin: 0;
+    }
+    .detail-card dl div {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      transition: border-color var(--motion-fast) ease, transform var(--motion-fast) ease;
+    }
+    .detail-card dl div:hover {
+      border-color: #cbd5e1;
+      transform: translateY(-1px);
+    }
+    .detail-card dt {
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .detail-card dd {
+      color: #0f172a;
+      font-weight: 750;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+    .profile-section {
+      border-top: 1px solid #e5e7eb;
+      margin-top: 16px;
+      padding-top: 14px;
+    }
+    .profile-section h3 {
+      font-size: 14px;
+      margin: 0 0 10px;
+    }
+    .profile-section p {
+      color: #64748b;
+      margin: 0;
+    }
+    .chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip-list span {
+      background: #eef2ff;
+      border-radius: 999px;
+      color: #3730a3;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 6px 10px;
+    }
+    @media (max-width: 620px) {
+      .detail-card header {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .detail-card dl {
+        grid-template-columns: 1fr;
+      }
     }
   `],
 })
@@ -131,6 +287,8 @@ export class UsersComponent implements OnInit {
   photoName = '';
   isDraggingPhoto = false;
   formErrors: string[] = [];
+  selectedUser?: AppUser;
+  userToDelete?: AppUser;
   form: { name: string; email: string; phone: string; password: string } = {
     name: '',
     email: '',
@@ -209,15 +367,23 @@ export class UsersComponent implements OnInit {
 
   detail(user: AppUser): void {
     this.api.user(user.id).subscribe((detail) => {
-      const profiles = detail.profiles?.map((profile) => profile.name).join(', ') || 'Sin perfiles';
-      alert(`${detail.user_code}\n${detail.email}\n${detail.name}\nTelefono: ${detail.phone ?? 'N/A'}\nPerfiles: ${profiles}`);
+      this.selectedUser = detail;
     });
   }
 
   remove(user: AppUser): void {
-    if (confirm(`Eliminar ${user.name}?`)) {
-      this.api.deleteUser(user.id).subscribe(() => this.load());
+    this.userToDelete = user;
+  }
+
+  confirmDelete(): void {
+    if (!this.userToDelete) {
+      return;
     }
+
+    this.api.deleteUser(this.userToDelete.id).subscribe(() => {
+      this.userToDelete = undefined;
+      this.load();
+    });
   }
 
   reset(): void {
@@ -227,6 +393,8 @@ export class UsersComponent implements OnInit {
     this.photoName = '';
     this.isDraggingPhoto = false;
     this.formErrors = [];
+    this.selectedUser = undefined;
+    this.userToDelete = undefined;
     this.form = { name: '', email: '', phone: '', password: '' };
   }
 

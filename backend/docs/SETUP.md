@@ -21,6 +21,31 @@ Credenciales iniciales:
 - Usuario: `admin@tap.local`
 - Contrasena: `Password123!`
 
+Si se usa Laragon, el virtual host local apunta a:
+
+```text
+http://tap-admission-api.test
+```
+
+La documentacion Swagger queda disponible en:
+
+```text
+http://tap-admission-api.test/docs/
+```
+
+El contrato OpenAPI tambien puede abrirse o importarse desde:
+
+```text
+http://tap-admission-api.test/docs/openapi.yaml
+```
+
+Para probar rutas protegidas en Swagger:
+
+1. Ejecutar `POST /login`.
+2. Copiar el valor de `token`.
+3. Presionar `Authorize`.
+4. Pegar el token con formato `Bearer TOKEN`.
+
 ## Frontend
 
 Desde `tap-admission/frontend`:
@@ -30,6 +55,6 @@ pnpm install
 pnpm start
 ```
 
-Abrir `http://127.0.0.1:4200`.
+Abrir `http://localhost:4300`.
 
 Nota: en el sandbox de Codex el build de Angular puede fallar por permisos de lectura al resolver rutas padre con esbuild. Los archivos existen y Node puede leerlos; en una terminal normal de Windows el build debe ejecutarse con la estructura creada.

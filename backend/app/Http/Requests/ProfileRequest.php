@@ -7,7 +7,7 @@ use Illuminate\Validation\Rule;
 
 class ProfileRequest extends FormRequest
 {
-    public const SECTIONS = ['products', 'users', 'profiles'];
+    public const SECTIONS = ['products', 'users', 'profiles', 'audit_logs'];
 
     public function authorize(): bool
     {

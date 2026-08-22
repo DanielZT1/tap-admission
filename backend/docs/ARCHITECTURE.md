@@ -14,6 +14,7 @@ El examen solicita un sistema con Laravel 11/PHP 8.2+, Angular 19/TypeScript 5.x
 - Codigos automaticos: prefijos `PRD`, `USR`, `PRF` con fecha y sufijo aleatorio. Evita capturar codigos manualmente y mantiene legibilidad.
 - Bitacora: cada alta, edicion y eliminacion crea un documento con `previous`, `current`, entidad, accion y usuario actor.
 - Exportaciones: `maatwebsite/excel` para XLSX y `barryvdh/laravel-dompdf` para PDF.
+- Documentacion API: especificacion OpenAPI 3.0 en `public/docs/openapi.yaml` y Swagger UI en `public/docs/index.html`.
 
 ## Modelo NoSQL
 
@@ -60,3 +61,4 @@ El examen solicita un sistema con Laravel 11/PHP 8.2+, Angular 19/TypeScript 5.x
 3. Mostrar que las contrasenas usan hashing de Laravel y que recuperacion genera una temporal.
 4. Mostrar un update y revisar `audit_logs` para comprobar comparacion antes/despues.
 5. Explicar la decision Angular 19 + TypeScript 5.8 por compatibilidad oficial.
+6. Abrir Swagger UI en `/docs/`, autenticar con token Bearer y demostrar el contrato de endpoints con ejemplos.

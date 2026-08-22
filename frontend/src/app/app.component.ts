@@ -1,5 +1,5 @@
-import { Component, computed } from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Component, computed, signal } from '@angular/core';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { ApiService } from './core/api.service';
 import { SessionService } from './core/session.service';
 
@@ -23,6 +23,9 @@ import { SessionService } from './core/session.service';
             }
             @if (session.can('profiles')) {
               <a routerLink="/profiles">Perfiles</a>
+            }
+            @if (session.can('audit_logs')) {
+              <a routerLink="/audit-logs">Bitacora</a>
             }
           </nav>
         }
@@ -81,11 +84,15 @@ import { SessionService } from './core/session.service';
       min-width: 0;
       padding: 10px 12px;
       text-decoration: none;
+      transition: background var(--motion-fast) ease, color var(--motion-fast) ease, transform var(--motion-fast) ease;
     }
     nav a:hover {
       background: #1f2937;
+      color: #fff;
+      transform: translateX(2px);
     }
     .content {
+      animation: surface-in var(--motion-slow) var(--ease-out) both;
       padding: 24px;
       min-width: 0;
       width: 100%;
@@ -162,14 +169,37 @@ import { SessionService } from './core/session.service';
   `],
 })
 export class AppComponent {
-  readonly title = computed(() => this.session.user() ? 'Panel administrativo' : 'Acceso al sistema');
-  readonly subtitle = computed(() => this.session.user() ? 'Gestion de catalogos y permisos' : 'Ingresa con tus credenciales');
+  private readonly currentUrl = signal('');
+
+  readonly title = computed(() => {
+    if (!this.session.user()) {
+      return 'Acceso al sistema';
+    }
+
+    return this.sectionHeader().title;
+  });
+
+  readonly subtitle = computed(() => {
+    if (!this.session.user()) {
+      return 'Ingresa con tus credenciales';
+    }
+
+    return this.sectionHeader().subtitle;
+  });
 
   constructor(
     readonly session: SessionService,
     private readonly api: ApiService,
     private readonly router: Router,
-  ) {}
+  ) {
+    this.currentUrl.set(this.router.url);
+
+    this.router.events.subscribe((event) => {
+      if (event instanceof NavigationEnd) {
+        this.currentUrl.set(event.urlAfterRedirects);
+      }
+    });
+  }
 
   logout(): void {
     this.api.logout().subscribe({
@@ -181,5 +211,35 @@ export class AppComponent {
   private finishLogout(): void {
     this.session.clear();
     this.router.navigateByUrl('/login');
+  }
+
+  private sectionHeader(): { title: string; subtitle: string } {
+    const path = this.currentUrl().split('?')[0];
+
+    if (path.startsWith('/users')) {
+      return {
+        title: 'Usuarios',
+        subtitle: 'Gestion de usuarios, credenciales y perfiles asignados',
+      };
+    }
+
+    if (path.startsWith('/profiles')) {
+      return {
+        title: 'Perfiles',
+        subtitle: 'Gestion de permisos y secciones disponibles',
+      };
+    }
+
+    if (path.startsWith('/audit-logs')) {
+      return {
+        title: 'Bitacora',
+        subtitle: 'Comparacion de informacion anterior contra informacion actual',
+      };
+    }
+
+    return {
+      title: 'Productos',
+      subtitle: 'Gestion del catalogo de productos',
+    };
   }
 }

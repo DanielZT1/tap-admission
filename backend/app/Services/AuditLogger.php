@@ -15,7 +15,7 @@ class AuditLogger
             'entity_id' => (string) $model->getKey(),
             'action' => $action,
             'previous' => $previous,
-            'current' => $model->fresh()?->toArray(),
+            'current' => $action === 'deleted' ? null : $model->fresh()?->toArray(),
             'actor_user_code' => Auth::user()?->user_code,
         ]);
     }

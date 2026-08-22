@@ -38,3 +38,14 @@ export interface AppUser {
   profiles?: Profile[];
   created_at: string;
 }
+
+export interface AuditLog {
+  id: string;
+  entity: string;
+  entity_id: string;
+  action: string;
+  previous: Record<string, unknown> | null;
+  current: Record<string, unknown> | null;
+  actor_user_code?: string;
+  created_at: string;
+}

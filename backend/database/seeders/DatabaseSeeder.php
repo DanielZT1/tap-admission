@@ -18,9 +18,17 @@ class DatabaseSeeder extends Seeder
             ['profile_code' => 'PRF-ADMIN'],
             [
                 'name' => 'Administrador',
-                'section_keys' => ['products', 'users', 'profiles'],
+                'section_keys' => ['products', 'users', 'profiles', 'audit_logs'],
             ],
         );
+
+        $adminSections = collect($adminProfile->section_keys ?? [])
+            ->merge(['products', 'users', 'profiles', 'audit_logs'])
+            ->unique()
+            ->values()
+            ->all();
+
+        $adminProfile->forceFill(['section_keys' => $adminSections])->save();
 
         Profile::firstOrCreate(
             ['profile_code' => 'PRF-CATALOGOS'],
