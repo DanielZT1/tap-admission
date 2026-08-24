@@ -1,4 +1,5 @@
-import { Component, computed, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, OnDestroy, computed, effect, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { ApiService } from './core/api.service';
 import { SessionService } from './core/session.service';
@@ -168,8 +169,11 @@ import { SessionService } from './core/session.service';
     }
   `],
 })
-export class AppComponent {
+const tokenRefreshIntervalMs = 60 * 60 * 1000;
+
+export class AppComponent implements OnDestroy {
   private readonly currentUrl = signal('');
+  private tokenRefreshTimer?: ReturnType<typeof setInterval>;
 
   readonly title = computed(() => {
     if (!this.session.user()) {
@@ -199,6 +203,19 @@ export class AppComponent {
         this.currentUrl.set(event.urlAfterRedirects);
       }
     });
+
+    effect(() => {
+      if (this.session.token()) {
+        this.startTokenRefresh();
+        return;
+      }
+
+      this.stopTokenRefresh();
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.stopTokenRefresh();
   }
 
   logout(): void {
@@ -209,8 +226,41 @@ export class AppComponent {
   }
 
   private finishLogout(): void {
+    this.stopTokenRefresh();
     this.session.clear();
     this.router.navigateByUrl('/login');
+  }
+
+  private startTokenRefresh(): void {
+    if (this.tokenRefreshTimer) {
+      return;
+    }
+
+    this.tokenRefreshTimer = setInterval(() => this.refreshToken(), tokenRefreshIntervalMs);
+  }
+
+  private stopTokenRefresh(): void {
+    if (!this.tokenRefreshTimer) {
+      return;
+    }
+
+    clearInterval(this.tokenRefreshTimer);
+    this.tokenRefreshTimer = undefined;
+  }
+
+  private refreshToken(): void {
+    if (!this.session.user()) {
+      return;
+    }
+
+    this.api.refreshToken().subscribe({
+      next: ({ token, user }) => this.session.save(token, user),
+      error: (error: HttpErrorResponse) => {
+        if ([401, 403].includes(error.status)) {
+          this.finishLogout();
+        }
+      },
+    });
   }
 
   private sectionHeader(): { title: string; subtitle: string } {

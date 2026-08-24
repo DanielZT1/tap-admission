@@ -41,6 +41,20 @@ class AuthController extends Controller
         return response()->json(['message' => 'Sesion cerrada.']);
     }
 
+    public function refreshToken(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $currentToken = $user?->currentAccessToken();
+
+        $plainTextToken = $user->createToken('tap-admission')->plainTextToken;
+        $currentToken?->delete();
+
+        return response()->json([
+            'token' => $plainTextToken,
+            'user' => $this->userPayload($user),
+        ]);
+    }
+
     public function recoverPassword(Request $request): JsonResponse
     {
         $data = $request->validate([

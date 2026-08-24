@@ -20,6 +20,10 @@ export class ApiService {
     return this.http.post<{ message: string }>(`${apiUrl}/logout`, {});
   }
 
+  refreshToken() {
+    return this.http.post<LoginResponse>(`${apiUrl}/refresh-token`, {});
+  }
+
   auditLogs() {
     return this.http.get<AuditLog[]>(`${apiUrl}/audit-logs`);
   }

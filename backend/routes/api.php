@@ -17,6 +17,7 @@ Route::post('/recover-password', [AuthController::class, 'recoverPassword']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
 
     Route::get('/audit-logs', [AuditLogController::class, 'index'])
         ->middleware('section:audit_logs');

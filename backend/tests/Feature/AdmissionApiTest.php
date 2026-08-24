@@ -75,6 +75,43 @@ class AdmissionApiTest extends TestCase
             ->assertJsonPath('errors.email.0', 'Las credenciales no son validas.');
     }
 
+    public function test_refresh_token_regresa_un_token_nuevo_y_revoca_el_anterior(): void
+    {
+        $profile = $this->createProfile(['products']);
+
+        User::create([
+            'user_code' => 'USR-TEST',
+            'name' => 'Usuario Test',
+            'email' => 'admin@tap.local',
+            'phone' => '+523141234567',
+            'profile_photo_path' => 'profiles/admin.png',
+            'profile_ids' => [(string) $profile->getKey()],
+            'password' => 'Password123!',
+        ]);
+
+        $loginResponse = $this->postJson('/api/login', [
+            'email' => 'admin@tap.local',
+            'password' => 'Password123!',
+        ]);
+
+        $token = $loginResponse->json('token');
+
+        $response = $this
+            ->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/refresh-token');
+
+        $response
+            ->assertOk()
+            ->assertJsonStructure([
+                'token',
+                'user' => ['id', 'user_code', 'name', 'email', 'sections'],
+            ])
+            ->assertJsonPath('user.email', 'admin@tap.local');
+
+        $this->assertNotSame($token, $response->json('token'));
+        $this->assertSame(1, PersonalAccessToken::count());
+    }
+
     public function test_no_permite_crear_producto_con_precio_mayor_a_tres_digitos(): void
     {
         Sanctum::actingAs($this->createUserWithSections(['products']));
