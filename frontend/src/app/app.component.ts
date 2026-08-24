@@ -4,6 +4,8 @@ import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router
 import { ApiService } from './core/api.service';
 import { SessionService } from './core/session.service';
 
+const tokenRefreshIntervalMs = 60 * 60 * 1000;
+
 @Component({
   selector: 'tap-root',
   imports: [RouterLink, RouterOutlet],
@@ -169,8 +171,6 @@ import { SessionService } from './core/session.service';
     }
   `],
 })
-const tokenRefreshIntervalMs = 60 * 60 * 1000;
-
 export class AppComponent implements OnDestroy {
   private readonly currentUrl = signal('');
   private tokenRefreshTimer?: ReturnType<typeof setInterval>;
