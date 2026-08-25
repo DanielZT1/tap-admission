@@ -99,7 +99,7 @@ const ignoredFields = new Set(['created_at', 'updated_at', 'id', '_id']);
           </header>
 
           <section class="summary-card">
-            <h3>Resumen entendible del movimiento</h3>
+            <h3>Movimiento</h3>
             <ul>
               @for (change of describeChanges(selectedLog); track change) {
                 <li>{{ change }}</li>
