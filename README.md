@@ -171,5 +171,5 @@ pnpm build
 
 ```text
 backend/public/docs/openapi.yaml
-backend/postman/tap-admission.postman_collection.json
+backend/public/docs/index.html
 ```
