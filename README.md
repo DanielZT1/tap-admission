@@ -20,20 +20,33 @@ cd tap-admission
 
 ## 2. Levantar MongoDB local
 
-Con MongoDB instalado globalmente:
+Crear carpeta de datos dentro del proyecto:
 
 ```powershell
-mongod --dbpath C:\data\db --bind_ip 127.0.0.1 --port 27017
+mkdir .\work\mongodb-data
 ```
 
-Con el binario del workspace:
+Si `mongod` esta disponible en el PATH:
 
 ```powershell
-cd C:\Users\PC\Documents\Codex\2026-08-20\ne
-.\tools\mongodb\mongodb-win32-x86_64-windows-8.0.20\bin\mongod.exe --dbpath .\work\mongodb-data --bind_ip 127.0.0.1 --port 27017
+mongod --dbpath .\work\mongodb-data --bind_ip 127.0.0.1 --port 27017
 ```
 
-MongoDB Compass:
+Si `mongod` no esta disponible, busca el ejecutable instalado:
+
+```powershell
+Get-ChildItem "C:\Program Files\MongoDB" -Recurse -Filter mongod.exe
+```
+
+Y ejecutalo con la ruta encontrada. Ejemplo:
+
+```powershell
+& "C:\Program Files\MongoDB\Server\8.3\bin\mongod.exe" --dbpath .\work\mongodb-data --bind_ip 127.0.0.1 --port 27017
+```
+
+Si no existe `mongod.exe`, instala MongoDB Community Server o usa MongoDB Atlas.
+
+Conexion en MongoDB Compass:
 
 ```text
 mongodb://127.0.0.1:27017
@@ -48,6 +61,15 @@ composer install
 php artisan key:generate
 ```
 
+Si `php` no se reconoce en PowerShell, agrega PHP de Laragon al PATH de esa terminal:
+
+```powershell
+$env:Path = "F:\laragon\bin\php\php-8.4.24;$env:Path"
+php -v
+```
+
+Si `composer` no se reconoce, instala Composer o ejecutalo desde Laragon si lo tienes configurado.
+
 Variables minimas en `backend/.env`:
 
 ```env
@@ -61,6 +83,8 @@ MAIL_MAILER=log
 Seed inicial:
 
 ```powershell
+php artisan config:clear
+php artisan cache:clear
 php artisan db:seed
 ```
 
@@ -69,7 +93,7 @@ php artisan db:seed
 Virtual host:
 
 ```text
-tap-admission/backend/public
+<RUTA_DEL_PROYECTO>/backend/public
 ```
 
 URL local esperada:
@@ -88,6 +112,14 @@ http://tap-admission-api.test/api/health
 
 ```powershell
 cd frontend
+pnpm install
+pnpm start
+```
+
+Si el proyecto fue copiado o movido y Angular marca que no encuentra `node_modules/@angular/cli`, reinstala dependencias:
+
+```powershell
+Remove-Item -Recurse -Force .\node_modules
 pnpm install
 pnpm start
 ```
@@ -122,6 +154,7 @@ Password: Password123!
 Backend:
 
 ```powershell
+$env:Path = "F:\laragon\bin\php\php-8.4.24;$env:Path"
 php artisan cache:clear
 php artisan config:clear
 php artisan route:clear
