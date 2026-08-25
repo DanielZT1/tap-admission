@@ -19,7 +19,7 @@ const actionLabels: Record<string, string> = {
 
 const fieldLabels: Record<string, string> = {
   brand: 'marca',
-  email: 'usuario',
+  email: 'correo',
   name: 'nombre',
   phone: 'telefono',
   price: 'precio',
@@ -74,7 +74,7 @@ const ignoredFields = new Set(['created_at', 'updated_at', 'id', '_id']);
                 <td>{{ log.actor_user_code || 'Sistema' }}</td>
                 <td class="mono">{{ log.entity_id }}</td>
                 <td>
-                  <button class="btn ghost" type="button" (click)="selectedLog = log">Comparar</button>
+                  <button class="btn ghost" type="button" (click)="selectedLog = log">Detalle</button>
                 </td>
               </tr>
             } @empty {

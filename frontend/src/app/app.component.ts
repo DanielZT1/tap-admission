@@ -41,6 +41,11 @@ const tokenRefreshIntervalMs = 60 * 60 * 1000;
           </div>
           @if (session.user()) {
             <div class="account">
+              @if (session.user()?.profile_photo_url) {
+                <img class="avatar" [src]="session.user()?.profile_photo_url ?? ''" alt="Foto de perfil">
+              } @else {
+                <span class="avatar placeholder" aria-hidden="true">{{ initials(session.user()?.name) }}</span>
+              }
               <span>{{ session.user()?.name }}</span>
               <button class="btn secondary" type="button" (click)="logout()">Salir</button>
             </div>
@@ -127,6 +132,23 @@ const tokenRefreshIntervalMs = 60 * 60 * 1000;
       gap: 10px;
       flex: 0 0 auto;
       max-width: 100%;
+    }
+    .avatar {
+      border: 2px solid #e5e7eb;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      height: 34px;
+      object-fit: cover;
+      width: 34px;
+    }
+    .avatar.placeholder {
+      align-items: center;
+      background: #1d4ed8;
+      color: #fff;
+      display: inline-flex;
+      font-size: 12px;
+      font-weight: 800;
+      justify-content: center;
     }
     .account span {
       overflow: hidden;
@@ -223,6 +245,16 @@ export class AppComponent implements OnDestroy {
       next: () => this.finishLogout(),
       error: () => this.finishLogout(),
     });
+  }
+
+  initials(name?: string | null): string {
+    return (name ?? 'U')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase();
   }
 
   private finishLogout(): void {

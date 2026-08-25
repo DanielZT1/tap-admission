@@ -1,6 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { EMPTY, Subject, catchError, exhaustMap, finalize, tap } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { Profile } from '../../core/api.models';
 import { SessionService } from '../../core/session.service';
@@ -17,31 +19,18 @@ const sections = [
   selector: 'tap-profiles',
   imports: [FormsModule],
   template: `
-    <section class="panel">
-      <form class="grid-form" (ngSubmit)="save()">
-        <div class="field">
-          <label for="name">Nombre</label>
-          <input id="name" name="name" required [(ngModel)]="name">
+    <section class="panel list">
+      <div class="datatable-toolbar">
+        <div>
+          <h2>Perfiles registrados</h2>
+          <span>{{ profiles.length }} perfil{{ profiles.length === 1 ? '' : 'es' }} de permisos</span>
         </div>
-        <fieldset>
-          <legend>Secciones</legend>
-          @for (section of sections; track section.key) {
-            <label class="check">
-              <input type="checkbox" [checked]="selected.has(section.key)" (change)="toggle(section.key)">
-              <span>{{ section.label }}</span>
-            </label>
-          }
-        </fieldset>
-        <div class="actions submit">
-          <button class="btn primary" type="submit">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
-          <button class="btn secondary" type="button" (click)="reset()">Limpiar</button>
+        <div class="actions">
+          <button class="btn primary" type="button" (click)="openCreate()">Nuevo</button>
           <button class="btn secondary" type="button" (click)="download('pdf')">PDF</button>
           <button class="btn secondary" type="button" (click)="download('excel')">Excel</button>
         </div>
-      </form>
-    </section>
-
-    <section class="panel list">
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -71,6 +60,42 @@ const sections = [
         </table>
       </div>
     </section>
+
+    @if (isFormOpen) {
+      <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="profile-form-title">
+        <article class="form-modal profile-form-modal">
+          <header>
+            <div>
+              <span>{{ editingId ? 'Edicion' : 'Alta' }}</span>
+              <h2 id="profile-form-title">{{ editingId ? 'Editar perfil' : 'Nuevo perfil' }}</h2>
+            </div>
+            <button class="btn secondary" type="button" (click)="closeForm()">Cerrar</button>
+          </header>
+
+          <form class="grid-form" (ngSubmit)="save()">
+            <div class="field">
+              <label for="name">Nombre</label>
+              <input id="name" name="name" required placeholder="Ej. Catalogos" [(ngModel)]="name">
+            </div>
+            <fieldset>
+              <legend>Secciones</legend>
+              @for (section of sections; track section.key) {
+                <label class="check">
+                  <input type="checkbox" [checked]="selected.has(section.key)" (change)="toggle(section.key)">
+                  <span>{{ section.label }}</span>
+                </label>
+              }
+            </fieldset>
+            <div class="actions submit">
+              <button class="btn primary" type="submit" [disabled]="isSaving">
+                {{ isSaving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Guardar') }}
+              </button>
+              <button class="btn secondary" type="button" (click)="clearForm()">Limpiar</button>
+            </div>
+          </form>
+        </article>
+      </div>
+    }
 
     @if (profileToView) {
       <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="profile-detail-title">
@@ -121,7 +146,9 @@ const sections = [
           <p>Esta accion eliminara <strong>{{ profileToDelete.name }}</strong> del catalogo de perfiles.</p>
           <div class="actions">
             <button class="btn secondary" type="button" (click)="profileToDelete = undefined">Cancelar</button>
-            <button class="btn danger" type="button" (click)="confirmDelete()">Eliminar</button>
+            <button class="btn danger" type="button" [disabled]="isDeleting" (click)="confirmDelete()">
+              {{ isDeleting ? 'Eliminando...' : 'Eliminar' }}
+            </button>
           </div>
         </article>
       </div>
@@ -255,6 +282,10 @@ const sections = [
   `],
 })
 export class ProfilesComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly saveRequests = new Subject<void>();
+  private readonly deleteRequests = new Subject<Profile>();
+
   readonly sections = sections;
   profiles: Profile[] = [];
   editingId = '';
@@ -262,12 +293,52 @@ export class ProfilesComponent implements OnInit {
   selected = new Set<string>(['products']);
   profileToView?: Profile;
   profileToDelete?: Profile;
+  isFormOpen = false;
+  isSaving = false;
+  isDeleting = false;
 
   constructor(
     private readonly api: ApiService,
     private readonly router: Router,
     private readonly session: SessionService,
-  ) {}
+  ) {
+    this.saveRequests.pipe(
+      exhaustMap(() => {
+        const profileId = this.editingId || undefined;
+        const payload = {
+          name: this.name,
+          section_keys: [...this.selected],
+        };
+        this.isSaving = true;
+
+        return this.api.saveProfile(payload, profileId).pipe(
+          tap(() => {
+            this.closeForm();
+            this.load();
+          }),
+          catchError(() => EMPTY),
+          finalize(() => this.isSaving = false),
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
+
+    this.deleteRequests.pipe(
+      exhaustMap((profile) => {
+        this.isDeleting = true;
+
+        return this.api.deleteProfile(profile.id).pipe(
+          tap(() => {
+            this.profileToDelete = undefined;
+            this.load();
+          }),
+          catchError(() => EMPTY),
+          finalize(() => this.isDeleting = false),
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
+  }
 
   ngOnInit(): void {
     if (!this.session.user()) {
@@ -286,13 +357,12 @@ export class ProfilesComponent implements OnInit {
   }
 
   save(): void {
-    this.api.saveProfile({
-      name: this.name,
-      section_keys: [...this.selected],
-    }, this.editingId || undefined).subscribe(() => {
-      this.reset();
-      this.load();
-    });
+    this.saveRequests.next();
+  }
+
+  openCreate(): void {
+    this.clearForm();
+    this.isFormOpen = true;
   }
 
   edit(profile: Profile): void {
@@ -300,6 +370,7 @@ export class ProfilesComponent implements OnInit {
       this.editingId = detail.id;
       this.name = detail.name;
       this.selected = new Set(detail.section_keys ?? []);
+      this.isFormOpen = true;
     });
   }
 
@@ -318,16 +389,22 @@ export class ProfilesComponent implements OnInit {
       return;
     }
 
-    this.api.deleteProfile(this.profileToDelete.id).subscribe(() => {
-      this.profileToDelete = undefined;
-      this.load();
-    });
+    this.deleteRequests.next(this.profileToDelete);
   }
 
-  reset(): void {
+  clearForm(): void {
     this.editingId = '';
     this.name = '';
     this.selected = new Set<string>(['products']);
+  }
+
+  closeForm(): void {
+    this.isFormOpen = false;
+    this.clearForm();
+  }
+
+  reset(): void {
+    this.closeForm();
     this.profileToView = undefined;
     this.profileToDelete = undefined;
   }

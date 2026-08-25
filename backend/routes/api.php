@@ -14,6 +14,8 @@ Route::get('/health', fn () => response()->json([
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/recover-password', [AuthController::class, 'recoverPassword']);
+Route::get('/profile-photos/{filename}', [UserController::class, 'profilePhoto'])
+    ->where('filename', '[A-Za-z0-9._-]+');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

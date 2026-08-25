@@ -3,6 +3,7 @@ export interface SessionUser {
   user_code: string;
   name: string;
   email: string;
+  profile_photo_url?: string | null;
   sections: string[];
 }
 
@@ -35,6 +36,7 @@ export interface AppUser {
   name: string;
   phone?: string;
   profile_photo_path?: string;
+  profile_photo_url?: string | null;
   profiles?: Profile[];
   created_at: string;
 }

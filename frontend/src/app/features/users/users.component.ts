@@ -1,6 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { EMPTY, Subject, catchError, exhaustMap, finalize, forkJoin, tap } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { AppUser, Profile } from '../../core/api.models';
 import { SessionService } from '../../core/session.service';
@@ -10,84 +12,25 @@ import { saveBlob } from '../../shared/download';
   selector: 'tap-users',
   imports: [FormsModule],
   template: `
-    <section class="panel">
-      @if (formErrors.length) {
-        <div class="alert-card" role="alert">
-          <strong>No se pudo dar de alta el usuario</strong>
-          <span>Revisa los siguientes puntos antes de continuar.</span>
-          <ul>
-            @for (error of formErrors; track error) {
-              <li>{{ error }}</li>
-            }
-          </ul>
+    <section class="panel list">
+      <div class="datatable-toolbar">
+        <div>
+          <h2>Usuarios registrados</h2>
+          <span>{{ users.length }} usuario{{ users.length === 1 ? '' : 's' }} con acceso al sistema</span>
         </div>
-      }
-
-      <form class="grid-form" (ngSubmit)="save()">
-        <div class="field">
-          <label for="name">Nombre</label>
-          <input id="name" name="name" maxlength="120" required [(ngModel)]="form.name">
-        </div>
-        <div class="field">
-          <label for="email">Usuario</label>
-          <input id="email" name="email" type="email" maxlength="160" required [(ngModel)]="form.email">
-        </div>
-        <div class="field">
-          <label for="phone">Telefono</label>
-          <input id="phone" name="phone" placeholder="+523141234567" [(ngModel)]="form.phone">
-        </div>
-        <div class="field">
-          <label for="password">Contrasena</label>
-          <input id="password" name="password" type="password" [(ngModel)]="form.password">
-        </div>
-        <div class="field">
-          <label for="photo">Foto de perfil</label>
-          <label
-            class="dropzone"
-            [class.active]="isDraggingPhoto"
-            for="photo"
-            (dragover)="onPhotoDragOver($event)"
-            (dragleave)="onPhotoDragLeave($event)"
-            (drop)="onPhotoDrop($event)"
-          >
-            <strong>{{ photoName || 'Arrastra una imagen aqui' }}</strong>
-            <span>JPG, PNG o WEBP. Maximo 2 MB.</span>
-          </label>
-          <input
-            class="visually-hidden-input"
-            id="photo"
-            name="photo"
-            type="file"
-            accept="image/*"
-            (change)="selectPhoto($event)"
-          >
-        </div>
-        <div class="field">
-          <label for="profile">Perfil</label>
-          <select id="profile" name="profile" required [(ngModel)]="profileId">
-            <option value="">Seleccionar</option>
-            @for (profile of profiles; track profile.id) {
-              <option [value]="profile.id">{{ profile.name }}</option>
-            }
-          </select>
-        </div>
-        <div class="form-actions submit">
-          <button class="btn primary" type="submit">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
-          <button class="btn secondary" type="button" (click)="reset()">Limpiar</button>
+        <div class="actions">
+          <button class="btn primary" type="button" (click)="openCreate()">Nuevo</button>
           <button class="btn secondary" type="button" (click)="download('pdf')">PDF</button>
           <button class="btn secondary" type="button" (click)="download('excel')">Excel</button>
         </div>
-      </form>
-    </section>
-
-    <section class="panel list">
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Codigo</th>
-              <th>Usuario</th>
               <th>Nombre</th>
+              <th>Correo</th>
               <th>Fecha de creacion</th>
               <th>Acciones</th>
             </tr>
@@ -96,8 +39,8 @@ import { saveBlob } from '../../shared/download';
             @for (user of users; track user.id) {
               <tr>
                 <td>{{ user.user_code }}</td>
-                <td>{{ user.email }}</td>
                 <td>{{ user.name }}</td>
+                <td>{{ user.email }}</td>
                 <td>{{ user.created_at }}</td>
                 <td>
                   <div class="actions">
@@ -112,6 +55,112 @@ import { saveBlob } from '../../shared/download';
         </table>
       </div>
     </section>
+
+    @if (isFormOpen) {
+      <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="user-form-title">
+        <article class="form-modal">
+          <header>
+            <div>
+              <span>{{ editingId ? 'Edicion' : 'Alta' }}</span>
+              <h2 id="user-form-title">{{ editingId ? 'Editar usuario' : 'Nuevo usuario' }}</h2>
+            </div>
+            <button class="btn secondary" type="button" (click)="closeForm()">Cerrar</button>
+          </header>
+
+          @if (formErrors.length) {
+            <div class="alert-card" role="alert">
+              <strong>No se pudo dar de alta el usuario</strong>
+              <span>Revisa los siguientes puntos antes de continuar.</span>
+              <ul>
+                @for (error of formErrors; track error) {
+                  <li>{{ error }}</li>
+                }
+              </ul>
+            </div>
+          }
+
+          <form class="grid-form" (ngSubmit)="save()">
+            <div class="field">
+              <label for="name">Nombre</label>
+              <input id="name" name="name" maxlength="120" required placeholder="Ej. Daniel Zamora" [(ngModel)]="form.name">
+            </div>
+            <div class="field">
+              <label for="email">Correo</label>
+              <input id="email" name="email" type="email" maxlength="160" required placeholder="Ej. usuario@correo.com" [(ngModel)]="form.email">
+            </div>
+            <div class="field">
+              <label for="phone">Telefono</label>
+              <div class="phone-field">
+                <input
+                  class="phone-prefix"
+                  id="phone_prefix"
+                  name="phone_prefix"
+                  inputmode="tel"
+                  maxlength="5"
+                  placeholder="Ej. +52"
+                  [ngModel]="selectedPhonePrefix"
+                  (keydown)="allowPhonePrefixKey($event)"
+                  (paste)="pastePhonePrefix($event)"
+                  (ngModelChange)="setPhonePrefix($event)"
+                >
+                <input
+                  id="phone"
+                  name="phone"
+                  inputmode="tel"
+                  maxlength="15"
+                  placeholder="Ej. 3141234567"
+                  [ngModel]="phoneNumber"
+                  (keydown)="allowDigitsOnly($event)"
+                  (paste)="pastePhoneNumber($event)"
+                  (ngModelChange)="setPhoneNumber($event)"
+                >
+              </div>
+            </div>
+            <div class="field">
+              <label for="password">Contraseña</label>
+              <input id="password" name="password" type="password" placeholder="Ej. Password123!" [(ngModel)]="form.password">
+            </div>
+            <div class="field">
+              <label for="photo">Foto de perfil</label>
+              <label
+                class="dropzone"
+                [class.active]="isDraggingPhoto"
+                for="photo"
+                (dragover)="onPhotoDragOver($event)"
+                (dragleave)="onPhotoDragLeave($event)"
+                (drop)="onPhotoDrop($event)"
+              >
+                <strong>{{ photoName || 'Arrastra una imagen aqui' }}</strong>
+                <span>JPG, PNG o WEBP. Maximo 2 MB.</span>
+              </label>
+              <input
+                class="visually-hidden-input"
+                id="photo"
+                name="photo"
+                type="file"
+                accept="image/*"
+                (change)="selectPhoto($event)"
+              >
+            </div>
+            <div class="field">
+              <label for="profile">Perfil</label>
+              <select id="profile" name="profile" required [(ngModel)]="profileId">
+                <option value="">Seleccionar</option>
+                @for (profile of profiles; track profile.id) {
+                  <option [value]="profile.id">{{ profile.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-actions submit">
+              <button class="btn primary" type="submit" [disabled]="isSaving">
+                {{ isSaving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Guardar') }}
+              </button>
+              <button class="btn secondary" type="button" (click)="clearForm()">Limpiar</button>
+            </div>
+          </form>
+        </article>
+      </div>
+    }
 
     @if (selectedUser) {
       <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="user-detail-title">
@@ -130,7 +179,7 @@ import { saveBlob } from '../../shared/download';
               <dd>{{ selectedUser.user_code }}</dd>
             </div>
             <div>
-              <dt>Usuario</dt>
+              <dt>Correo</dt>
               <dd>{{ selectedUser.email }}</dd>
             </div>
             <div>
@@ -139,7 +188,13 @@ import { saveBlob } from '../../shared/download';
             </div>
             <div>
               <dt>Foto de perfil</dt>
-              <dd>{{ selectedUser.profile_photo_path || 'Sin foto registrada' }}</dd>
+              <dd>
+                @if (selectedUser.profile_photo_url) {
+                  <img class="profile-photo-preview" [src]="selectedUser.profile_photo_url" alt="Foto de perfil de {{ selectedUser.name }}">
+                } @else {
+                  Sin foto registrada
+                }
+              </dd>
             </div>
           </dl>
 
@@ -166,7 +221,9 @@ import { saveBlob } from '../../shared/download';
           <p>Esta accion eliminara <strong>{{ userToDelete.name }}</strong> y sus tokens de acceso.</p>
           <div class="actions">
             <button class="btn secondary" type="button" (click)="userToDelete = undefined">Cancelar</button>
-            <button class="btn danger" type="button" (click)="confirmDelete()">Eliminar</button>
+            <button class="btn danger" type="button" [disabled]="isDeleting" (click)="confirmDelete()">
+              {{ isDeleting ? 'Eliminando...' : 'Eliminar' }}
+            </button>
           </div>
         </article>
       </div>
@@ -178,6 +235,19 @@ import { saveBlob } from '../../shared/download';
     }
     .list {
       margin-top: 16px;
+    }
+    .phone-field {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: minmax(72px, 82px) minmax(0, 1fr);
+      min-width: 0;
+    }
+    .phone-field select,
+    .phone-field input {
+      min-width: 0;
+    }
+    .phone-prefix {
+      text-align: center;
     }
     .detail-card {
       animation: modal-in var(--motion-base) var(--ease-out) both;
@@ -246,6 +316,15 @@ import { saveBlob } from '../../shared/download';
       margin-top: 16px;
       padding-top: 14px;
     }
+    .profile-photo-preview {
+      aspect-ratio: 1;
+      border: 2px solid #e5e7eb;
+      border-radius: 50%;
+      display: block;
+      max-width: 92px;
+      object-fit: cover;
+      width: 100%;
+    }
     .profile-section h3 {
       font-size: 14px;
       margin: 0 0 10px;
@@ -275,20 +354,33 @@ import { saveBlob } from '../../shared/download';
       .detail-card dl {
         grid-template-columns: 1fr;
       }
+      .phone-field {
+        grid-template-columns: 1fr;
+      }
     }
   `],
 })
 export class UsersComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly saveRequests = new Subject<void>();
+  private readonly deleteRequests = new Subject<AppUser>();
+  private readonly knownPhonePrefixes = ['+52', '+57', '+51', '+54', '+55', '+56', '+34', '+1'];
+
   users: AppUser[] = [];
   profiles: Profile[] = [];
   editingId = '';
   profileId = '';
+  selectedPhonePrefix = '+52';
+  phoneNumber = '';
   photo?: File;
   photoName = '';
   isDraggingPhoto = false;
   formErrors: string[] = [];
   selectedUser?: AppUser;
   userToDelete?: AppUser;
+  isFormOpen = false;
+  isSaving = false;
+  isDeleting = false;
   form: { name: string; email: string; phone: string; password: string } = {
     name: '',
     email: '',
@@ -300,7 +392,44 @@ export class UsersComponent implements OnInit {
     private readonly api: ApiService,
     private readonly router: Router,
     private readonly session: SessionService,
-  ) {}
+  ) {
+    this.saveRequests.pipe(
+      exhaustMap(() => {
+        const userId = this.editingId || undefined;
+        const payload = this.buildPayload();
+        this.isSaving = true;
+
+        return this.api.saveUser(payload, userId).pipe(
+          tap(() => {
+            this.closeForm();
+            this.load();
+          }),
+          catchError((error) => {
+            this.formErrors = this.extractErrors(error);
+            return EMPTY;
+          }),
+          finalize(() => this.isSaving = false),
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
+
+    this.deleteRequests.pipe(
+      exhaustMap((user) => {
+        this.isDeleting = true;
+
+        return this.api.deleteUser(user.id).pipe(
+          tap(() => {
+            this.userToDelete = undefined;
+            this.load();
+          }),
+          catchError(() => EMPTY),
+          finalize(() => this.isDeleting = false),
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
+  }
 
   ngOnInit(): void {
     if (!this.session.user()) {
@@ -311,8 +440,13 @@ export class UsersComponent implements OnInit {
   }
 
   load(): void {
-    this.api.users().subscribe((users) => this.users = users);
-    this.api.profiles().subscribe((profiles) => this.profiles = profiles);
+    forkJoin({
+      users: this.api.users(),
+      profiles: this.api.profiles(),
+    }).subscribe(({ users, profiles }) => {
+      this.users = users;
+      this.profiles = profiles;
+    });
   }
 
   selectPhoto(event: Event): void {
@@ -327,27 +461,12 @@ export class UsersComponent implements OnInit {
       return;
     }
 
-    const payload = new FormData();
-    payload.set('name', this.form.name);
-    payload.set('email', this.form.email);
-    payload.set('phone', this.form.phone);
-    payload.set('profile_ids[0]', this.profileId);
-    if (this.form.password) {
-      payload.set('password', this.form.password);
-    }
-    if (this.photo) {
-      payload.set('profile_photo', this.photo);
-    }
+    this.saveRequests.next();
+  }
 
-    this.api.saveUser(payload, this.editingId || undefined).subscribe({
-      next: () => {
-        this.reset();
-        this.load();
-      },
-      error: (error) => {
-        this.formErrors = this.extractErrors(error);
-      },
-    });
+  openCreate(): void {
+    this.clearForm();
+    this.isFormOpen = true;
   }
 
   edit(user: AppUser): void {
@@ -356,12 +475,14 @@ export class UsersComponent implements OnInit {
       this.form = {
         name: detail.name,
         email: detail.email,
-        phone: detail.phone ?? '',
+        phone: '',
         password: '',
       };
+      this.setPhoneFromStoredValue(detail.phone);
       this.profileId = detail.profiles?.[0]?.id ?? '';
       this.photoName = detail.profile_photo_path ? 'Foto actual cargada' : '';
       this.formErrors = [];
+      this.isFormOpen = true;
     });
   }
 
@@ -380,22 +501,30 @@ export class UsersComponent implements OnInit {
       return;
     }
 
-    this.api.deleteUser(this.userToDelete.id).subscribe(() => {
-      this.userToDelete = undefined;
-      this.load();
-    });
+    this.deleteRequests.next(this.userToDelete);
   }
 
-  reset(): void {
+  clearForm(): void {
     this.editingId = '';
     this.profileId = '';
+    this.selectedPhonePrefix = '+52';
+    this.phoneNumber = '';
     this.photo = undefined;
     this.photoName = '';
     this.isDraggingPhoto = false;
     this.formErrors = [];
+    this.form = { name: '', email: '', phone: '', password: '' };
+  }
+
+  closeForm(): void {
+    this.isFormOpen = false;
+    this.clearForm();
+  }
+
+  reset(): void {
+    this.closeForm();
     this.selectedUser = undefined;
     this.userToDelete = undefined;
-    this.form = { name: '', email: '', phone: '', password: '' };
   }
 
   download(type: 'pdf' | 'excel'): void {
@@ -446,7 +575,7 @@ export class UsersComponent implements OnInit {
     }
 
     if (!this.form.email.trim()) {
-      errors.push('El correo de usuario es obligatorio.');
+      errors.push('El correo es obligatorio.');
     }
 
     if (!this.profileId) {
@@ -457,11 +586,89 @@ export class UsersComponent implements OnInit {
       errors.push('La foto de perfil es obligatoria.');
     }
 
-    if (this.form.phone && !/^\+[1-9]\d{7,14}$/.test(this.form.phone)) {
-      errors.push('El telefono debe incluir codigo de pais, por ejemplo +523141234567.');
+    const phone = this.fullPhone();
+
+    if (phone && !/^\+[1-9]\d{7,14}$/.test(phone)) {
+      errors.push('El telefono debe incluir prefijo y entre 8 y 15 digitos.');
     }
 
     return errors;
+  }
+
+  allowDigitsOnly(event: KeyboardEvent): void {
+    if (this.isEditingShortcut(event) || /^\d$/.test(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+  }
+
+  allowPhonePrefixKey(event: KeyboardEvent): void {
+    if (this.isEditingShortcut(event) || /^\d$/.test(event.key)) {
+      return;
+    }
+
+    const input = event.target as HTMLInputElement;
+    const cursorAtStart = input.selectionStart === 0;
+    const plusIsMissing = !input.value.includes('+');
+
+    if (event.key === '+' && cursorAtStart && plusIsMissing) {
+      return;
+    }
+
+    event.preventDefault();
+  }
+
+  pastePhoneNumber(event: ClipboardEvent): void {
+    event.preventDefault();
+    this.setPhoneNumber(event.clipboardData?.getData('text') ?? '');
+  }
+
+  pastePhonePrefix(event: ClipboardEvent): void {
+    event.preventDefault();
+    this.setPhonePrefix(event.clipboardData?.getData('text') ?? '');
+  }
+
+  setPhoneNumber(value: string): void {
+    this.phoneNumber = value.replace(/\D/g, '').slice(0, 15);
+    this.form.phone = this.fullPhone();
+  }
+
+  setPhonePrefix(value: string): void {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    this.selectedPhonePrefix = digits ? `+${digits}` : '+';
+    this.form.phone = this.fullPhone();
+  }
+
+  private buildPayload(): FormData {
+    const payload = new FormData();
+    payload.set('name', this.form.name);
+    payload.set('email', this.form.email);
+    payload.set('phone', this.fullPhone());
+    payload.set('profile_ids[0]', this.profileId);
+    if (this.form.password) {
+      payload.set('password', this.form.password);
+    }
+    if (this.photo) {
+      payload.set('profile_photo', this.photo);
+    }
+
+    return payload;
+  }
+
+  private fullPhone(): string {
+    return this.phoneNumber ? `${this.selectedPhonePrefix}${this.phoneNumber}` : '';
+  }
+
+  private setPhoneFromStoredValue(phone?: string): void {
+    const cleanPhone = phone?.trim() ?? '';
+    const matchingPrefix = this.knownPhonePrefixes.find((prefix) => cleanPhone.startsWith(prefix));
+
+    this.selectedPhonePrefix = matchingPrefix ?? '+52';
+    this.phoneNumber = matchingPrefix
+      ? cleanPhone.slice(matchingPrefix.length).replace(/\D/g, '')
+      : cleanPhone.replace(/\D/g, '');
+    this.form.phone = this.fullPhone();
   }
 
   private extractErrors(error: unknown): string[] {
@@ -473,5 +680,11 @@ export class UsersComponent implements OnInit {
     }
 
     return [response.error?.message ?? 'No se pudo guardar el usuario.'];
+  }
+
+  private isEditingShortcut(event: KeyboardEvent): boolean {
+    const allowedKeys = new Set(['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End']);
+
+    return allowedKeys.has(event.key) || event.ctrlKey || event.metaKey;
   }
 }

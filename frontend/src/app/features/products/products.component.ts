@@ -1,6 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { CurrencyPipe } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { EMPTY, Subject, catchError, exhaustMap, finalize, tap } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { Product } from '../../core/api.models';
 import { SessionService } from '../../core/session.service';
@@ -8,56 +11,20 @@ import { saveBlob } from '../../shared/download';
 
 @Component({
   selector: 'tap-products',
-  imports: [FormsModule],
+  imports: [CurrencyPipe, FormsModule],
   template: `
-    <section class="panel">
-      @if (formErrors.length) {
-        <div class="alert-card" role="alert">
-          <strong>No se pudo dar de alta el producto</strong>
-          <span>Revisa los siguientes puntos antes de continuar.</span>
-          <ul>
-            @for (error of formErrors; track error) {
-              <li>{{ error }}</li>
-            }
-          </ul>
+    <section class="panel list">
+      <div class="datatable-toolbar">
+        <div>
+          <h2>Productos registrados</h2>
+          <span>{{ products.length }} producto{{ products.length === 1 ? '' : 's' }} en el catalogo</span>
         </div>
-      }
-
-      <form class="grid-form" (ngSubmit)="save()">
-        <div class="field">
-          <label for="name">Nombre</label>
-          <input id="name" name="name" maxlength="120" required [(ngModel)]="form.name">
-        </div>
-        <div class="field">
-          <label for="brand">Marca</label>
-          <input id="brand" name="brand" maxlength="120" required [(ngModel)]="form.brand">
-        </div>
-        <div class="field">
-          <label for="price">Precio</label>
-          <div class="input-prefix">
-            <span>$</span>
-            <input
-              id="price"
-              name="price"
-              inputmode="numeric"
-              maxlength="3"
-              placeholder="0"
-              required
-              [ngModel]="priceInput"
-              (ngModelChange)="setPrice($event)"
-            >
-          </div>
-        </div>
-        <div class="form-actions submit">
-          <button class="btn primary" type="submit">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
-          <button class="btn secondary" type="button" (click)="reset()">Limpiar</button>
+        <div class="actions">
+          <button class="btn primary" type="button" (click)="openCreate()">Nuevo</button>
           <button class="btn secondary" type="button" (click)="download('pdf')">PDF</button>
           <button class="btn secondary" type="button" (click)="download('excel')">Excel</button>
         </div>
-      </form>
-    </section>
-
-    <section class="panel list">
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -74,7 +41,7 @@ import { saveBlob } from '../../shared/download';
               <tr>
                 <td>{{ product.product_code }}</td>
                 <td>{{ product.name }}</td>
-                <td>{{ product.price }}</td>
+                <td>{{ product.price | currency: 'MXN' : 'symbol' : '1.2-2' }}</td>
                 <td>{{ product.created_at }}</td>
                 <td>
                   <div class="actions">
@@ -90,6 +57,67 @@ import { saveBlob } from '../../shared/download';
       </div>
     </section>
 
+    @if (isFormOpen) {
+      <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="product-form-title">
+        <article class="form-modal">
+          <header>
+            <div>
+              <span>{{ editingId ? 'Edicion' : 'Alta' }}</span>
+              <h2 id="product-form-title">{{ editingId ? 'Editar producto' : 'Nuevo producto' }}</h2>
+            </div>
+            <button class="btn secondary" type="button" (click)="closeForm()">Cerrar</button>
+          </header>
+
+          @if (formErrors.length) {
+            <div class="alert-card" role="alert">
+              <strong>No se pudo dar de alta el producto</strong>
+              <span>Revisa los siguientes puntos antes de continuar.</span>
+              <ul>
+                @for (error of formErrors; track error) {
+                  <li>{{ error }}</li>
+                }
+              </ul>
+            </div>
+          }
+
+          <form class="grid-form" (ngSubmit)="save()">
+            <div class="field">
+              <label for="name">Nombre</label>
+              <input id="name" name="name" maxlength="120" required placeholder="Ej. Botas de seguridad" [(ngModel)]="form.name">
+            </div>
+            <div class="field">
+              <label for="brand">Marca</label>
+              <input id="brand" name="brand" maxlength="120" required placeholder="Ej. Industrial Pro" [(ngModel)]="form.brand">
+            </div>
+            <div class="field">
+              <label for="price">Precio</label>
+              <div class="input-prefix">
+                <span>$</span>
+                <input
+                  id="price"
+                  name="price"
+                  inputmode="numeric"
+                  maxlength="3"
+                  placeholder="Ej. 245"
+                  required
+                  [ngModel]="priceInput"
+                  (keydown)="allowDigitsOnly($event)"
+                  (paste)="pastePrice($event)"
+                  (ngModelChange)="setPrice($event)"
+                >
+              </div>
+            </div>
+            <div class="form-actions submit">
+              <button class="btn primary" type="submit" [disabled]="isSaving">
+                {{ isSaving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Guardar') }}
+              </button>
+              <button class="btn secondary" type="button" (click)="clearForm()">Limpiar</button>
+            </div>
+          </form>
+        </article>
+      </div>
+    }
+
     @if (productToDelete) {
       <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="delete-title">
         <article class="confirm-card">
@@ -97,7 +125,9 @@ import { saveBlob } from '../../shared/download';
           <p>Esta accion eliminara <strong>{{ productToDelete.name }}</strong> del catalogo.</p>
           <div class="actions">
             <button class="btn secondary" type="button" (click)="productToDelete = undefined">Cancelar</button>
-            <button class="btn danger" type="button" (click)="confirmDelete()">Eliminar</button>
+            <button class="btn danger" type="button" [disabled]="isDeleting" (click)="confirmDelete()">
+              {{ isDeleting ? 'Eliminando...' : 'Eliminar' }}
+            </button>
           </div>
         </article>
       </div>
@@ -125,7 +155,7 @@ import { saveBlob } from '../../shared/download';
             </div>
             <div>
               <dt>Precio</dt>
-              <dd>&#36;{{ productToView.price }}</dd>
+              <dd>{{ productToView.price | currency: 'MXN' : 'symbol' : '1.2-2' }}</dd>
             </div>
             <div>
               <dt>Fecha de creacion</dt>
@@ -215,6 +245,10 @@ import { saveBlob } from '../../shared/download';
   `],
 })
 export class ProductsComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly saveRequests = new Subject<void>();
+  private readonly deleteRequests = new Subject<Product>();
+
   products: Product[] = [];
   editingId = '';
   form: Partial<Product> = { name: '', brand: '', price: 0 };
@@ -222,12 +256,52 @@ export class ProductsComponent implements OnInit {
   priceInput = '';
   productToDelete?: Product;
   productToView?: Product;
+  isFormOpen = false;
+  isSaving = false;
+  isDeleting = false;
 
   constructor(
     private readonly api: ApiService,
     private readonly router: Router,
     private readonly session: SessionService,
-  ) {}
+  ) {
+    this.saveRequests.pipe(
+      exhaustMap(() => {
+        const productId = this.editingId || undefined;
+        const payload = { ...this.form };
+        this.isSaving = true;
+
+        return this.api.saveProduct(payload, productId).pipe(
+          tap(() => {
+            this.closeForm();
+            this.load();
+          }),
+          catchError((error) => {
+            this.formErrors = this.extractErrors(error);
+            return EMPTY;
+          }),
+          finalize(() => this.isSaving = false),
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
+
+    this.deleteRequests.pipe(
+      exhaustMap((product) => {
+        this.isDeleting = true;
+
+        return this.api.deleteProduct(product.id).pipe(
+          tap(() => {
+            this.productToDelete = undefined;
+            this.load();
+          }),
+          catchError(() => EMPTY),
+          finalize(() => this.isDeleting = false),
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe();
+  }
 
   ngOnInit(): void {
     if (!this.session.user()) {
@@ -248,15 +322,12 @@ export class ProductsComponent implements OnInit {
       return;
     }
 
-    this.api.saveProduct(this.form, this.editingId || undefined).subscribe({
-      next: () => {
-        this.reset();
-        this.load();
-      },
-      error: (error) => {
-        this.formErrors = this.extractErrors(error);
-      },
-    });
+    this.saveRequests.next();
+  }
+
+  openCreate(): void {
+    this.clearForm();
+    this.isFormOpen = true;
   }
 
   edit(product: Product): void {
@@ -264,6 +335,7 @@ export class ProductsComponent implements OnInit {
     this.form = { name: product.name, brand: product.brand, price: product.price };
     this.priceInput = String(product.price);
     this.formErrors = [];
+    this.isFormOpen = true;
   }
 
   view(product: Product): void {
@@ -279,22 +351,41 @@ export class ProductsComponent implements OnInit {
       return;
     }
 
-    this.api.deleteProduct(this.productToDelete.id).subscribe(() => {
-      this.productToDelete = undefined;
-      this.load();
-    });
+    this.deleteRequests.next(this.productToDelete);
   }
 
-  reset(): void {
+  clearForm(): void {
     this.editingId = '';
     this.form = { name: '', brand: '', price: 0 };
     this.priceInput = '';
     this.formErrors = [];
+  }
+
+  closeForm(): void {
+    this.isFormOpen = false;
+    this.clearForm();
+  }
+
+  reset(): void {
+    this.closeForm();
     this.productToView = undefined;
   }
 
   download(type: 'pdf' | 'excel'): void {
     this.api.download('products', type).subscribe((blob) => saveBlob(blob, `productos.${type === 'pdf' ? 'pdf' : 'xlsx'}`));
+  }
+
+  allowDigitsOnly(event: KeyboardEvent): void {
+    if (this.isEditingShortcut(event) || /^\d$/.test(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+  }
+
+  pastePrice(event: ClipboardEvent): void {
+    event.preventDefault();
+    this.setPrice(event.clipboardData?.getData('text') ?? '');
   }
 
   setPrice(value: string): void {
@@ -331,5 +422,11 @@ export class ProductsComponent implements OnInit {
     }
 
     return [response.error?.message ?? 'No se pudo guardar el producto.'];
+  }
+
+  private isEditingShortcut(event: KeyboardEvent): boolean {
+    const allowedKeys = new Set(['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End']);
+
+    return allowedKeys.has(event.key) || event.ctrlKey || event.metaKey;
   }
 }

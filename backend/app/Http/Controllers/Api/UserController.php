@@ -12,9 +12,11 @@ use App\Services\CodeGenerator;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UserController extends Controller
 {
@@ -55,6 +57,13 @@ class UserController extends Controller
     public function show(User $user): JsonResponse
     {
         return response()->json($this->detail($user));
+    }
+
+    public function profilePhoto(string $filename): StreamedResponse
+    {
+        abort_unless(Storage::disk('public')->exists("profiles/{$filename}"), 404);
+
+        return Storage::disk('public')->response("profiles/{$filename}");
     }
 
     public function update(UserRequest $request, User $user): JsonResponse
@@ -121,6 +130,7 @@ class UserController extends Controller
             'user_code' => $user->user_code,
             'email' => $user->email,
             'name' => $user->name,
+            'profile_photo_url' => $this->profilePhotoUrl($user),
             'created_at' => $user->created_at?->format('d/m/Y H:i'),
         ];
     }
@@ -139,5 +149,14 @@ class UserController extends Controller
                 ])
                 ->values(),
         ];
+    }
+
+    private function profilePhotoUrl(User $user): ?string
+    {
+        if (! $user->profile_photo_path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost().'/api/profile-photos/'.rawurlencode(basename($user->profile_photo_path));
     }
 }

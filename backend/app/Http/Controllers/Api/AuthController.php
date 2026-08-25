@@ -91,7 +91,17 @@ class AuthController extends Controller
             'user_code' => $user->user_code,
             'name' => $user->name,
             'email' => $user->email,
+            'profile_photo_url' => $this->profilePhotoUrl($user),
             'sections' => $user->allowedSections(),
         ];
+    }
+
+    private function profilePhotoUrl(User $user): ?string
+    {
+        if (! $user->profile_photo_path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost().'/api/profile-photos/'.rawurlencode(basename($user->profile_photo_path));
     }
 }

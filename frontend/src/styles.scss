@@ -154,6 +154,32 @@ button {
   width: 100%;
 }
 
+.datatable-toolbar {
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin: -2px 0 14px;
+  padding-bottom: 14px;
+}
+
+.datatable-toolbar h2 {
+  color: #0f172a;
+  font-size: 18px;
+  margin: 0 0 3px;
+}
+
+.datatable-toolbar span {
+  color: #64748b;
+  display: block;
+  font-size: 13px;
+}
+
+.datatable-toolbar .actions {
+  justify-content: flex-end;
+}
+
 table {
   border-collapse: collapse;
   min-width: 760px;
@@ -204,7 +230,13 @@ th {
 .grid-form {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  min-width: 0;
+  width: 100%;
+}
+
+.grid-form > * {
+  min-width: 0;
 }
 
 .form-actions {
@@ -292,6 +324,42 @@ th {
   width: min(100%, 430px);
 }
 
+.form-modal {
+  animation: modal-in var(--motion-base) var(--ease-out) both;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
+  max-height: min(90vh, 820px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 20px;
+  width: min(100%, 920px);
+}
+
+.form-modal header {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.form-modal header span {
+  color: #64748b;
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.form-modal h2 {
+  color: #0f172a;
+  font-size: 20px;
+  margin: 0;
+}
+
 .confirm-card h2 {
   font-size: 19px;
   margin: 0 0 8px;
@@ -353,6 +421,15 @@ th {
   .actions {
     align-items: stretch;
     width: 100%;
+  }
+
+  .datatable-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .datatable-toolbar .actions {
+    justify-content: stretch;
   }
 
   .form-actions .btn {
