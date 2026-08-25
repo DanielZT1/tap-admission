@@ -17,6 +17,29 @@ const actionLabels: Record<string, string> = {
   deleted: 'Eliminacion',
 };
 
+const fieldLabels: Record<string, string> = {
+  brand: 'marca',
+  email: 'usuario',
+  name: 'nombre',
+  phone: 'telefono',
+  price: 'precio',
+  product_code: 'codigo de producto',
+  profile_code: 'codigo de perfil',
+  profile_ids: 'perfiles asignados',
+  profile_photo_path: 'foto de perfil',
+  section_keys: 'secciones permitidas',
+  user_code: 'codigo de usuario',
+};
+
+const sectionLabels: Record<string, string> = {
+  audit_logs: 'Bitacora',
+  products: 'Productos',
+  profiles: 'Perfiles',
+  users: 'Usuarios',
+};
+
+const ignoredFields = new Set(['created_at', 'updated_at', 'id', '_id']);
+
 @Component({
   selector: 'tap-audit-logs',
   imports: [CommonModule],
@@ -75,16 +98,14 @@ const actionLabels: Record<string, string> = {
             <button class="btn secondary" type="button" (click)="selectedLog = undefined">Cerrar</button>
           </header>
 
-          <div class="compare-grid">
-            <section>
-              <h3>Informacion anterior</h3>
-              <pre>{{ formatJson(selectedLog.previous) }}</pre>
-            </section>
-            <section>
-              <h3>Informacion actual</h3>
-              <pre>{{ formatJson(selectedLog.current) }}</pre>
-            </section>
-          </div>
+          <section class="summary-card">
+            <h3>Resumen entendible del movimiento</h3>
+            <ul>
+              @for (change of describeChanges(selectedLog); track change) {
+                <li>{{ change }}</li>
+              }
+            </ul>
+          </section>
         </article>
       </div>
     }
@@ -152,44 +173,48 @@ const actionLabels: Record<string, string> = {
       color: #64748b;
       margin: 4px 0 0;
     }
-    .compare-grid {
-      display: grid;
-      gap: 14px;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .compare-grid section {
+    .summary-card {
       border: 1px solid #e5e7eb;
       border-radius: 8px;
       min-width: 0;
       overflow: hidden;
     }
-    .compare-grid h3 {
+    .summary-card h3 {
       background: #f8fafc;
       border-bottom: 1px solid #e5e7eb;
       font-size: 14px;
       margin: 0;
       padding: 10px 12px;
     }
-    pre {
-      color: #0f172a;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-      line-height: 1.45;
+    .summary-card ul {
+      display: grid;
+      gap: 10px;
+      list-style: none;
       margin: 0;
-      max-height: 420px;
-      overflow: auto;
+      padding: 14px;
+    }
+    .summary-card li {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      color: #0f172a;
+      line-height: 1.5;
       padding: 12px;
-      white-space: pre-wrap;
-      word-break: break-word;
+    }
+    .summary-card li::before {
+      color: #2563eb;
+      content: 'Cambio';
+      display: block;
+      font-size: 11px;
+      font-weight: 900;
+      margin-bottom: 4px;
+      text-transform: uppercase;
     }
     @media (max-width: 820px) {
       .section-head,
       .audit-card header {
         align-items: stretch;
         flex-direction: column;
-      }
-      .compare-grid {
-        grid-template-columns: 1fr;
       }
     }
   `],
@@ -230,7 +255,94 @@ export class AuditLogsComponent implements OnInit {
     return actionLabels[action] ?? action;
   }
 
-  formatJson(value: Record<string, unknown> | null): string {
-    return value ? JSON.stringify(value, null, 2) : 'Sin informacion';
+  describeChanges(log: AuditLog): string[] {
+    if (log.action === 'created') {
+      return this.describeCreated(log);
+    }
+
+    if (log.action === 'deleted') {
+      return this.describeDeleted(log);
+    }
+
+    return this.describeUpdated(log);
+  }
+
+  private describeCreated(log: AuditLog): string[] {
+    const name = this.entityName(log.current);
+
+    return [`Se registro ${this.entityArticle(log.entity)} ${this.entityLabel(log.entity).toLowerCase()} "${name}".`];
+  }
+
+  private describeDeleted(log: AuditLog): string[] {
+    const name = this.entityName(log.previous);
+
+    return [`Se elimino ${this.entityArticle(log.entity)} ${this.entityLabel(log.entity).toLowerCase()} "${name}".`];
+  }
+
+  private describeUpdated(log: AuditLog): string[] {
+    const previous = log.previous ?? {};
+    const current = log.current ?? {};
+    const fields = Array.from(new Set([...Object.keys(previous), ...Object.keys(current)]))
+      .filter((field) => !ignoredFields.has(field))
+      .filter((field) => this.normalizeValue(previous[field]) !== this.normalizeValue(current[field]));
+
+    if (!fields.length) {
+      return ['No se detectaron cambios visibles para el usuario.'];
+    }
+
+    return fields.map((field) => {
+      const previousValue = this.humanValue(field, previous[field]);
+      const currentValue = this.humanValue(field, current[field]);
+
+      return `El campo ${this.fieldLabel(field)} cambio de ${previousValue} a ${currentValue}.`;
+    });
+  }
+
+  private entityName(value: Record<string, unknown> | null): string {
+    return String(value?.['name'] ?? value?.['email'] ?? value?.['product_code'] ?? value?.['profile_code'] ?? 'sin nombre');
+  }
+
+  private entityArticle(entity: string): string {
+    return entity === 'profile' ? 'el' : 'el';
+  }
+
+  private fieldLabel(field: string): string {
+    return fieldLabels[field] ?? field.replaceAll('_', ' ');
+  }
+
+  private humanValue(field: string, value: unknown): string {
+    if (value === null || value === undefined || value === '') {
+      return 'sin valor';
+    }
+
+    if (Array.isArray(value)) {
+      if (!value.length) {
+        return 'sin elementos';
+      }
+
+      return value.map((item) => this.humanArrayItem(field, item)).join(', ');
+    }
+
+    if (field === 'price') {
+      return `$${value}`;
+    }
+
+    if (typeof value === 'object') {
+      return 'informacion relacionada';
+    }
+
+    return `"${String(value)}"`;
+  }
+
+  private humanArrayItem(field: string, value: unknown): string {
+    if (field === 'section_keys') {
+      return sectionLabels[String(value)] ?? String(value);
+    }
+
+    return String(value);
+  }
+
+  private normalizeValue(value: unknown): string {
+    return JSON.stringify(value ?? null);
   }
 }
