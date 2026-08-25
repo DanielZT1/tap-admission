@@ -161,6 +161,7 @@ export class LoginComponent {
             this.router.navigateByUrl('/products');
           }),
           catchError(() => {
+            this.session.clear();
             this.message = 'Credenciales incorrectas o API no disponible.';
             return EMPTY;
           }),

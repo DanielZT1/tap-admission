@@ -16,7 +16,7 @@ const tokenRefreshIntervalMs = 60 * 60 * 1000;
           <strong>TAP</strong>
           <span>Desarrollo</span>
         </div>
-        @if (session.user()) {
+        @if (showSessionChrome()) {
           <nav>
             @if (session.can('products')) {
               <a routerLink="/products">Productos</a>
@@ -39,7 +39,7 @@ const tokenRefreshIntervalMs = 60 * 60 * 1000;
             <h1>{{ title() }}</h1>
             <p>{{ subtitle() }}</p>
           </div>
-          @if (session.user()) {
+          @if (showSessionChrome()) {
             <div class="account">
               @if (session.user()?.profile_photo_url) {
                 <img class="avatar" [src]="session.user()?.profile_photo_url ?? ''" alt="Foto de perfil">
@@ -196,9 +196,11 @@ const tokenRefreshIntervalMs = 60 * 60 * 1000;
 export class AppComponent implements OnDestroy {
   private readonly currentUrl = signal('');
   private tokenRefreshTimer?: ReturnType<typeof setInterval>;
+  readonly isLoginRoute = computed(() => this.currentUrl().split('?')[0].startsWith('/login'));
+  readonly showSessionChrome = computed(() => Boolean(this.session.user()) && !this.isLoginRoute());
 
   readonly title = computed(() => {
-    if (!this.session.user()) {
+    if (!this.session.user() || this.isLoginRoute()) {
       return 'Acceso al sistema';
     }
 
@@ -206,7 +208,7 @@ export class AppComponent implements OnDestroy {
   });
 
   readonly subtitle = computed(() => {
-    if (!this.session.user()) {
+    if (!this.session.user() || this.isLoginRoute()) {
       return 'Ingresa con tus credenciales';
     }
 
